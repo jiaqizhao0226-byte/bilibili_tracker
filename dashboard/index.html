@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B站游戏热点监控看板</title>
+<style>
+:root {
+  --bg: #0f0f13;
+  --card: #1a1a24;
+  --card-hover: #22223a;
+  --border: #2a2a3e;
+  --text: #e4e4ef;
+  --text2: #9999b0;
+  --accent: #00a1d6;
+  --pink: #fb7299;
+  --green: #23c55e;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --purple: #a855f7;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.status-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.status-badge.running { border-color: var(--green); color: var(--green); }
+.status-badge.idle { border-color: var(--text2); color: var(--text2); }
+.header-right { display: flex; gap: 8px; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .2s;
+}
+.btn:hover { background: var(--card-hover); border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: #0090c0; }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: rgba(239,68,68,.15); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  overflow-x: auto;
+}
+.tab {
+  padding: 12px 20px;
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Content ── */
+.content { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+/* ── Stats Row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.stat-card .label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.stat-card .value { font-size: 24px; font-weight: 700; }
+.stat-card .sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+/* ── Filters ── */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.filter-bar label { font-size: 12px; color: var(--text2); }
+.filter-bar select,
+.filter-bar input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.filter-bar select:focus,
+.filter-bar input:focus { outline: none; border-color: var(--accent); }
+.filter-group { display: flex; align-items: center; gap: 6px; }
+
+/* ── Hot Search Tags ── */
+.hot-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.hot-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.hot-tag:hover { border-color: var(--pink); color: var(--pink); }
+.hot-tag .rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  min-width: 16px;
+}
+.hot-tag .rank.top3 { color: var(--pink); }
+
+/* ── Video Grid ── */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.video-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all .2s;
+  cursor: pointer;
+}
+.video-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,161,214,.12);
+}
+.video-card.hot {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 1px var(--pink);
+}
+.video-card .cover {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: var(--border);
+}
+.video-card .info { padding: 12px; }
+.video-card .title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.video-card .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  flex-wrap: wrap;
+}
+.video-card .meta .author { color: var(--accent); }
+.video-card .stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text2);
+}
+.video-card .stats span { display: flex; align-items: center; gap: 3px; }
+.video-card .source-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,161,214,.15);
+  color: var(--accent);
+}
+.video-card .hot-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(251,114,153,.15);
+  color: var(--pink);
+  font-weight: 600;
+}
+
+/* ── Ranking Table ── */
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ranking-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 60px;
+  background: var(--bg);
+  cursor: pointer;
+  user-select: none;
+}
+.ranking-table th:hover { color: var(--accent); }
+.ranking-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.ranking-table tr:hover { background: var(--card); }
+.ranking-table .rank-num {
+  font-weight: 700;
+  width: 40px;
+  text-align: center;
+}
+.ranking-table .rank-num.top1 { color: var(--pink); font-size: 16px; }
+.ranking-table .rank-num.top2 { color: var(--orange); font-size: 15px; }
+.ranking-table .rank-num.top3 { color: var(--purple); font-size: 14px; }
+.ranking-table .title-cell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ranking-table .title-cell a {
+  color: var(--text);
+  text-decoration: none;
+}
+.ranking-table .title-cell a:hover { color: var(--accent); }
+.ranking-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Settings Panel ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 200;
+  justify-content: center;
+  align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+.modal h2 {
+  font-size: 18px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal .close-btn {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 20px;
+  cursor: pointer;
+}
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.form-group textarea { min-height: 80px; resize: vertical; }
+.form-group input:focus,
+.form-group textarea:focus { outline: none; border-color: var(--accent); }
+.form-group .hint { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.tag-input-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 40px;
+}
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0,161,214,.15);
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.tag-item .remove {
+  cursor: pointer;
+  opacity: .6;
+  font-size: 14px;
+}
+.tag-item .remove:hover { opacity: 1; }
+.tag-input-area input {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  flex: 1;
+  min-width: 100px;
+  padding: 4px;
+  font-size: 13px;
+}
+.tag-input-area input:focus { outline: none; }
+
+/* ── Empty State ── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text2);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+.empty-state .title { font-size: 16px; margin-bottom: 8px; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  background: var(--card);
+  border: 1px solid var(--green);
+  border-radius: 10px;
+  font-size: 13px;
+  z-index: 300;
+  animation: slideIn .3s ease;
+}
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } }
+
+/* ── Loading ── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text2);
+}
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin-right: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── View Toggle ── */
+.view-toggle { display: flex; gap: 4px; }
+.view-toggle .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .content { padding: 12px 16px; }
+  .video-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">B站游戏热点监控</div>
+    <span class="status-badge idle" id="statusBadge">未运行</span>
+    <span style="font-size:12px;color:var(--text2)" id="lastCollectTime"></span>
+  </div>
+  <div class="header-right">
+    <button class="btn" onclick="collectNow()" id="collectBtn">立即采集</button>
+    <button class="btn" onclick="toggleScheduler()" id="schedulerBtn">启动定时</button>
+    <button class="btn" onclick="openSettings()">设置</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="overview" onclick="switchTab('overview')">总览</div>
+  <div class="tab" data-tab="trending" onclick="switchTab('trending')">爆款发现</div>
+  <div class="tab" data-tab="pvtracker" onclick="switchTab('pvtracker')">新游PV</div>
+</div>
+
+<!-- Content -->
+<div class="content" id="mainContent">
+  <div class="loading"><div class="spinner"></div>加载中...</div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>
+      监控设置
+      <button class="close-btn" onclick="closeSettings()">&times;</button>
+    </h2>
+
+    <div class="form-group">
+      <label>监控关键词（回车添加）</label>
+      <div class="tag-input-area" id="keywordsArea">
+        <input type="text" id="keywordInput" placeholder="输入关键词后按回车..." onkeydown="addKeyword(event)">
+      </div>
+      <div class="hint">这些关键词会在B站搜索对应游戏相关视频</div>
+    </div>
+
+    <div class="form-group">
+      <label>采集间隔（分钟）</label>
+      <input type="number" id="intervalInput" value="60" min="10" max="1440">
+      <div class="hint">建议 60 分钟，太频繁可能被B站限制</div>
+    </div>
+
+    <div class="form-group">
+      <label>爆款播放量阈值</label>
+      <input type="number" id="playThreshold" value="500000">
+      <div class="hint">超过该播放量的24h内新视频会被标记为爆款并推送通知</div>
+    </div>
+
+    <div class="form-group">
+      <label>爆款点赞量阈值</label>
+      <input type="number" id="likeThreshold" value="50000">
+    </div>
+
+    <hr style="border-color:var(--border);margin:20px 0">
+
+    <h3 style="font-size:15px;margin-bottom:12px">消息推送</h3>
+
+    <div class="form-group">
+      <label>推送开关</label>
+      <select id="notifyEnabled">
+        <option value="false">关闭</option>
+        <option value="true">开启</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>推送渠道</label>
+      <select id="notifyType">
+        <option value="feishu">飞书机器人</option>
+        <option value="wecom">企业微信机器人</option>
+        <option value="dingtalk">钉钉机器人</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Webhook URL</label>
+      <input type="url" id="webhookUrl" placeholder="粘贴你的 Webhook 地址...">
+      <div class="hint">
+        飞书：群设置 → 群机器人 → 添加自定义机器人 → 复制 Webhook 地址<br>
+        企业微信：群聊 → 添加群机器人 → 复制 Webhook 地址<br>
+        钉钉：群设置 → 智能群助手 → 添加自定义机器人 → 复制 Webhook 地址
+      </div>
+    </div>
+
+    <hr style="border-color:var(--border);margin:20px 0">
+
+    <h3 style="font-size:15px;margin-bottom:12px">关注UP主（可选）</h3>
+    <div class="form-group">
+      <label>UP主列表</label>
+      <textarea id="upMidsInput" placeholder="每行一个，格式: UP主名称=UID&#10;例如:&#10;老番茄=546195&#10;影视飓风=946974"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentTab = 'overview';
+let currentData = null;
+let currentConfig = null;
+let schedulerRunning = false;
+
+// ── Utility ──
+function fmtNum(n) {
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '亿';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return String(n);
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr.replace(' ', 'T'));
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+  if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+  return dateStr;
+}
+
+function toast(msg, color = 'var(--green)') {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.borderColor = color;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── API ──
+async function fetchData(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  try {
+    const resp = await fetch(`${API}/api/data?${qs}`);
+    if (!resp.ok) {
+      if (resp.status === 404) return null;
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    return await resp.json();
+  } catch (e) {
+    console.error('fetchData error:', e);
+    return null;
+  }
+}
+
+async function fetchConfig() {
+  try {
+    const resp = await fetch(`${API}/api/config`);
+    return await resp.json();
+  } catch { return null; }
+}
+
+async function fetchStatus() {
+  try {
+    const resp = await fetch(`${API}/api/status`);
+    return await resp.json();
+  } catch { return null; }
+}
+
+async function postConfig(cfg) {
+  const resp = await fetch(`${API}/api/config`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(cfg),
+  });
+  return await resp.json();
+}
+
+async function collectNow() {
+  const btn = document.getElementById('collectBtn');
+  btn.disabled = true;
+  btn.textContent = '采集中...';
+  try {
+    await fetch(`${API}/api/collect`);
+    toast('采集任务已启动，请稍候刷新');
+    setTimeout(() => loadData(), 30000);
+  } catch (e) {
+    toast('采集失败: ' + e.message, 'var(--red)');
+  }
+  btn.disabled = false;
+  btn.textContent = '立即采集';
+}
+
+async function toggleScheduler() {
+  const btn = document.getElementById('schedulerBtn');
+  if (schedulerRunning) {
+    await fetch(`${API}/api/scheduler/stop`, {method: 'POST'});
+    toast('定时采集已停止');
+  } else {
+    await fetch(`${API}/api/scheduler/start`, {method: 'POST'});
+    toast('定时采集已启动');
+  }
+  updateStatus();
+}
+
+// ── Data Loading ──
+async function loadData() {
+  const data = await fetchData();
+  currentData = data;
+  renderTab(currentTab);
+}
+
+async function updateStatus() {
+  const status = await fetchStatus();
+  if (!status) return;
+  schedulerRunning = status.running;
+
+  const badge = document.getElementById('statusBadge');
+  const btn = document.getElementById('schedulerBtn');
+
+  if (status.running) {
+    badge.className = 'status-badge running';
+    badge.textContent = status.status === 'collecting' ? '采集中...' : '运行中';
+    btn.textContent = '停止定时';
+    btn.className = 'btn btn-danger';
+  } else {
+    badge.className = 'status-badge idle';
+    badge.textContent = '未运行';
+    btn.textContent = '启动定时';
+    btn.className = 'btn';
+  }
+
+  const timeEl = document.getElementById('lastCollectTime');
+  if (status.last_collect_time) {
+    timeEl.textContent = '上次采集: ' + timeAgo(status.last_collect_time);
+  }
+}
+
+// ── Tab Switching ──
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  renderTab(tab);
+}
+
+async function renderTab(tab) {
+  const el = document.getElementById('mainContent');
+
+  // overview 和 pvtracker 有自己的API，不依赖采集数据
+  if (!currentData && tab !== 'pvtracker' && tab !== 'overview') {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <div class="title">暂无数据</div>
+        <p>点击上方「立即采集」获取B站游戏热点数据</p>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="collectNow()">立即采集</button>
+      </div>`;
+    return;
+  }
+
+  switch (tab) {
+    case 'overview': await renderOverview(el); break;
+    case 'trending': await renderTrending(el); break;
+    case 'pvtracker': await renderPVTracker(el); break;
+  }
+}
+
+// ── Overview Tab (近一周监控汇总) ──
+let overviewData = null;
+
+async function renderOverview(el) {
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>加载近一周汇总数据...</div>';
+
+  try {
+    let d;
+    if (window.__STATIC_MODE__ && window.__OVERVIEW_DATA__) {
+      d = window.__OVERVIEW_DATA__;
+    } else {
+      const resp = await fetch(`${API}/api/overview?days=7`);
+      d = await resp.json();
+    }
+    overviewData = d;
+
+    const total = d.total || 0;
+    const vids = d.videos || [];
+    const hotCount = d.hot_count || 0;
+    const totalPlay = d.total_play || 0;
+    const topFreshness = vids.length ? vids[0]?.freshness_score || 0 : 0;
+    const collectTime = d.meta?.collect_time || '';
+    const dayStats = d.day_stats || {};
+
+    let html = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:20px">📊</span>
+      <h2 style="font-size:18px">近一周监控汇总</h2>
+      <span style="font-size:12px;color:var(--text2);background:var(--card);padding:3px 10px;border-radius:10px">长期趋势追踪 · 跨采集聚合</span>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">近7天视频数</div>
+        <div class="value">${total}</div>
+        <div class="sub">去重 · 多次采集聚合</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">爆款视频 (50w+)</div>
+        <div class="value" style="color:var(--pink)">${hotCount}</div>
+        <div class="sub">近7天内</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">总播放量</div>
+        <div class="value" style="color:var(--accent)">${fmtNum(totalPlay)}</div>
+        <div class="sub">所有视频累计</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">最高新鲜度</div>
+        <div class="value" style="color:var(--orange)">${fmtNum(topFreshness)}</div>
+        <div class="sub">播放量/发布小时</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">采集次数</div>
+        <div class="value" style="color:var(--purple)">${d.collect_count || 0}</div>
+        <div class="sub">历史快照总数</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">最新采集</div>
+        <div class="value" style="font-size:14px">${timeAgo(collectTime)}</div>
+        <div class="sub">${collectTime ? collectTime.slice(0, 19) : '暂无'}</div>
+      </div>
+    </div>`;
+
+    // 每日趋势
+    const sortedDays = Object.keys(dayStats).sort();
+    if (sortedDays.length > 1) {
+      html += `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px">
+        <h3 style="font-size:14px;margin-bottom:12px">每日趋势</h3>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:120px;overflow-x:auto">
+          ${sortedDays.map(day => {
+            const s = dayStats[day];
+            const maxTotal = Math.max(...sortedDays.map(d => dayStats[d].total || 1));
+            const barH = Math.max(Math.round((s.total / maxTotal) * 100), 8);
+            const hotH = s.hot ? Math.max(Math.round((s.hot / maxTotal) * 100), 4) : 0;
+            return `<div style="flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="font-size:10px;color:var(--text2)">${s.total}</div>
+              <div style="width:100%;max-width:40px;position:relative">
+                <div style="width:100%;height:${barH}px;background:var(--accent)33;border-radius:4px 4px 0 0;position:relative">
+                  ${hotH ? `<div style="position:absolute;bottom:0;left:0;width:100%;height:${hotH}px;background:var(--pink)66;border-radius:0 0 0 0"></div>` : ''}
+                </div>
+              </div>
+              <div style="font-size:10px;color:var(--text2)">${day}</div>
+              ${s.hot ? `<div style="font-size:9px;color:var(--pink)">${s.hot}爆</div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text2)">
+          <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent)33;border-radius:2px;margin-right:4px"></span>视频数</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:var(--pink)66;border-radius:2px;margin-right:4px"></span>爆款(50w+)</span>
+        </div>
+      </div>`;
+    }
+
+    // 热搜
+    if (d.hot_search && d.hot_search.length) {
+      html += '<h3 style="margin-bottom:12px;font-size:15px">实时热搜</h3><div class="hot-search">';
+      d.hot_search.forEach(h => {
+        const cls = h.rank <= 3 ? 'top3' : '';
+        html += `<div class="hot-tag" onclick="searchKeyword('${h.keyword}')">
+          <span class="rank ${cls}">${h.rank}</span> ${h.keyword}
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    // 分类统计
+    const catCounts = {};
+    VIDEO_CATEGORIES.forEach(c => catCounts[c.id] = 0);
+    vids.forEach(v => { const c = classifyVideo(v); catCounts[c] = (catCounts[c] || 0) + 1; });
+
+    html += `<div style="margin:20px 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <h3 style="font-size:15px;margin-right:8px">内容分类</h3>
+      <span class="cat-filter-btn active" data-cat="all" onclick="filterOverviewByCat('all')" style="padding:4px 12px;border-radius:14px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--accent);color:#fff;transition:all .2s">全部 ${total}</span>
+      ${VIDEO_CATEGORIES.map(c => `<span class="cat-filter-btn" data-cat="${c.id}" onclick="filterOverviewByCat('${c.id}')" style="padding:4px 12px;border-radius:14px;font-size:12px;cursor:pointer;border:1px solid ${c.color}44;background:${c.color}15;color:${c.color};transition:all .2s">${c.name} ${catCounts[c.id]}</span>`).join('')}
+    </div>`;
+
+    // 新鲜爆款（按新鲜度排序）
+    html += '<h3 style="margin:20px 0 12px;font-size:15px">一周新鲜爆款 <span style="font-size:12px;color:var(--text2);font-weight:400">播放量高 + 发布时间新 = 新鲜度高</span></h3>';
+    html += '<div id="overviewVideoGrid">' + renderVideoGrid(vids.slice(0, 24)) + '</div>';
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--red);padding:20px;text-align:center">加载失败: ${e.message}</div>`;
+  }
+}
+
+let _overviewCatFilter = 'all';
+function filterOverviewByCat(catId) {
+  _overviewCatFilter = catId;
+  const vids = overviewData?.videos || [];
+  const filtered = catId === 'all' ? vids : vids.filter(v => classifyVideo(v) === catId);
+  const container = document.getElementById('overviewVideoGrid');
+  if (container) {
+    container.innerHTML = filtered.length
+      ? renderVideoGrid(filtered.slice(0, 24))
+      : '<div class="empty-state" style="padding:30px"><div class="title">该分类暂无视频</div></div>';
+  }
+  // 更新按钮样式
+  document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+    const id = btn.dataset.cat;
+    if (id === catId) {
+      const cat = id === 'all' ? null : getCategoryInfo(id);
+      btn.style.background = id === 'all' ? 'var(--accent)' : cat.color;
+      btn.style.color = '#fff';
+      btn.style.borderColor = id === 'all' ? 'var(--accent)' : cat.color;
+    } else {
+      const cat = id === 'all' ? null : getCategoryInfo(id);
+      btn.style.background = id === 'all' ? 'transparent' : cat.color + '15';
+      btn.style.color = id === 'all' ? 'var(--text2)' : cat.color;
+      btn.style.borderColor = id === 'all' ? 'var(--border)' : cat.color + '44';
+    }
+  });
+}
+
+// ── Trending Tab ──
+async function renderTrending(el) {
+  let html = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:20px">🔥</span>
+      <h2 style="font-size:18px">今日爆款</h2>
+      <span style="font-size:12px;color:var(--text2);background:var(--card);padding:3px 10px;border-radius:10px">聚焦当天最火视频</span>
+    </div>
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>最低播放量</label>
+        <select id="filterMinPlay" onchange="applyTrendingFilter()">
+          <option value="100000" selected>10万+</option>
+          <option value="500000">50万+</option>
+          <option value="1000000">100万+</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>时间范围</label>
+        <select id="filterHours" onchange="applyTrendingFilter()">
+          <option value="6">6小时内</option>
+          <option value="12">12小时内</option>
+          <option value="24" selected>24小时内</option>
+          <option value="48">2天内</option>
+          <option value="72">3天内</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>排序</label>
+        <select id="filterSort" onchange="applyTrendingFilter()">
+          <option value="freshness" selected>新鲜度</option>
+          <option value="play">播放量</option>
+          <option value="pubdate">最新发布</option>
+          <option value="like">点赞</option>
+          <option value="danmaku">弹幕</option>
+          <option value="reply">评论</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>搜索</label>
+        <input type="text" id="filterKeyword" placeholder="标题/描述关键词" onkeydown="if(event.key==='Enter')applyTrendingFilter()">
+      </div>
+      <div class="filter-group">
+        <label>分类</label>
+        <select id="filterCategory" onchange="applyTrendingFilter()">
+          <option value="">全部分类</option>
+          ${VIDEO_CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="applyTrendingFilter()">筛选</button>
+    </div>
+    <div style="color:var(--text2);font-size:12px;margin-bottom:12px">
+      💡 新鲜度 = 播放量 ÷ 发布小时数，越高说明视频越新越火
+    </div>
+    <div id="trendingResults"><div class="loading"><div class="spinner"></div>加载中...</div></div>`;
+
+  el.innerHTML = html;
+  applyTrendingFilter();
+}
+
+async function applyTrendingFilter() {
+  const minPlay = document.getElementById('filterMinPlay')?.value || 0;
+  const hours = document.getElementById('filterHours')?.value || 24;
+  const sort = document.getElementById('filterSort')?.value || 'freshness';
+  const keyword = document.getElementById('filterKeyword')?.value || '';
+
+  const data = await fetchData({min_play: minPlay, hours, sort, keyword});
+  const container = document.getElementById('trendingResults');
+  if (!data || !data.videos || !data.videos.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div class="title">没有找到符合条件的视频</div><p>试试扩大时间范围或降低播放量门槛</p></div>';
+    return;
+  }
+
+  const catFilter = document.getElementById('filterCategory')?.value || '';
+  let videos = data.videos;
+  if (catFilter) {
+    videos = videos.filter(v => classifyVideo(v) === catFilter);
+  }
+
+  if (!videos.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div class="title">该分类下没有视频</div><p>试试换个分类或扩大筛选条件</p></div>';
+    return;
+  }
+
+  container.innerHTML = `<p style="color:var(--text2);font-size:13px;margin-bottom:12px">共 ${videos.length} 条结果</p>` + renderVideoGrid(videos);
+}
+
+// ── PV Tracker Tab (新游PV时间轴) ──
+let pvTimelineData = null;
+let pvAutoRefreshTimer = null;
+
+function getTrustBadge(trust) {
+  if (trust === 'official') return {label: '官方', color: '#a855f7', bg: '#a855f722'};
+  if (trust === 'media') return {label: '媒体', color: '#3b82f6', bg: '#3b82f622'};
+  if (trust === 'creator') return {label: '创作者', color: '#9999b0', bg: '#9999b015'};
+  return {label: '未知', color: '#9999b0', bg: '#9999b010'};
+}
+
+async function renderPVTracker(el) {
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:20px">🎬</span>
+      <h2 style="font-size:18px">新游PV首曝</h2>
+      <span style="font-size:12px;color:var(--text2);background:var(--card);padding:3px 10px;border-radius:10px">聚焦全新游戏首曝 · 权威来源优先</span>
+    </div>
+
+    <!-- 24小时时间轴 -->
+    <div id="pvTimeline">
+      <div class="loading"><div class="spinner"></div>正在搜索全新游戏PV首曝...</div>
+    </div>`;
+
+  loadPVTimeline();
+}
+
+async function loadPVTimeline() {
+  const hours = 48;
+  const container = document.getElementById('pvTimeline');
+
+  if (container) container.innerHTML = '<div class="loading"><div class="spinner"></div>正在搜索全新游戏PV首曝...</div>';
+
+  try {
+    if (window.__STATIC_MODE__) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding:40px">
+          <div class="icon">🎬</div>
+          <div class="title">PV追踪需要后端服务</div>
+          <p>静态模式下无法实时搜索PV，请查看「总览」和「爆款发现」tab</p>
+        </div>`;
+      return;
+    }
+    const resp = await fetch(`${API}/api/pv_timeline?hours=${hours}&include_creators=0`);
+    const data = await resp.json();
+    pvTimelineData = data;
+
+    if (!data || !data.videos || !data.videos.length) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding:40px">
+          <div class="icon">🎬</div>
+          <div class="title">近${hours}小时暂无全新游戏PV</div>
+          <p>暂未发现新游PV首曝内容</p>
+        </div>`;
+    } else {
+      renderPVTimelineView(data.videos, container, hours);
+    }
+
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--red);padding:20px;text-align:center">加载失败: ${e.message}</div>`;
+  }
+}
+
+function renderPVTimelineView(videos, container, hours) {
+  const now = new Date();
+  const nowTs = now.getTime() / 1000;
+
+  // 按小时分组
+  const hourGroups = {};
+  for (let i = 0; i < hours; i++) {
+    const h = new Date(now.getTime() - i * 3600000);
+    const key = `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')} ${String(h.getHours()).padStart(2,'0')}:00`;
+    hourGroups[key] = [];
+  }
+
+  videos.forEach(v => {
+    const pubTs = v.pubdate_ts || 0;
+    if (!pubTs) return;
+    const d = new Date(pubTs * 1000);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    if (hourGroups[key]) hourGroups[key].push(v);
+    else {
+      const closestKey = Object.keys(hourGroups).find(k => {
+        const kd = new Date(k.replace(' ', 'T') + ':00');
+        return Math.abs(kd.getTime() - d.getTime()) < 3600000;
+      });
+      if (closestKey) hourGroups[closestKey].push(v);
+    }
+  });
+
+  const sortedKeys = Object.keys(hourGroups).sort().reverse();
+  const dayGroups = {};
+  sortedKeys.forEach(key => {
+    const day = key.split(' ')[0];
+    if (!dayGroups[day]) dayGroups[day] = [];
+    dayGroups[day].push(key);
+  });
+
+  let html = '<div style="position:relative;padding-left:32px">';
+  html += '<div style="position:absolute;left:14px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--purple),var(--accent),var(--border))"></div>';
+
+  const sortedDays = Object.keys(dayGroups).sort().reverse();
+  
+  for (const day of sortedDays) {
+    const isToday = day === `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const dayLabel = isToday ? '今天' : day.slice(5);
+
+    html += `
+      <div style="position:relative;margin-bottom:6px">
+        <div style="position:absolute;left:-26px;top:2px;width:18px;height:18px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center">
+          <span style="font-size:9px;color:#fff;font-weight:700">📅</span>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:var(--purple);padding:4px 0">${dayLabel}</div>
+      </div>`;
+
+    const hoursInDay = dayGroups[day];
+    for (const hourKey of hoursInDay) {
+      const vids = hourGroups[hourKey];
+      const hourStr = hourKey.split(' ')[1];
+
+      if (!vids.length) continue;
+
+      html += `
+        <div style="position:relative;margin-bottom:20px">
+          <div style="position:absolute;left:-24px;top:8px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)"></div>
+          <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px">${hourStr}
+            <span style="font-size:11px;font-weight:400;color:var(--text2);margin-left:6px">${vids.length}个PV</span>
+          </div>`;
+
+      html += '<div style="display:flex;flex-direction:column;gap:10px">';
+      
+      vids.sort((a, b) => (b.pv_score || 0) - (a.pv_score || 0)); // 同一小时内按PV评分排
+      
+      for (const v of vids) {
+        const cover = v.cover ? (v.cover.startsWith('//') ? 'https:' + v.cover : v.cover) : '';
+        const videoUrl = v.url || (v.bvid ? `https://www.bilibili.com/video/${v.bvid}` : '');
+        const play = v.play || 0;
+        const ageMin = Math.round((nowTs - (v.pubdate_ts || nowTs)) / 60);
+        const ageStr = ageMin < 60 ? `${ageMin}分钟前` : ageMin < 1440 ? `${Math.round(ageMin/60)}小时前` : `${Math.round(ageMin/1440)}天前`;
+        const isHigh = play >= 100000;
+        const playColor = play >= 1000000 ? 'var(--pink)' : play >= 100000 ? 'var(--orange)' : play >= 10000 ? 'var(--accent)' : 'var(--text2)';
+        const tb = getTrustBadge(v.source_trust);
+        const pvScore = v.pv_score || 0;
+
+        html += `
+          <div style="display:flex;gap:12px;background:var(--card);border:1px solid ${v.source_trust==='official'?'var(--purple)44':isHigh?'var(--orange)33':'var(--border)'};border-radius:10px;padding:12px;cursor:pointer;transition:all .2s;${v.source_trust==='official'?'box-shadow:0 0 12px rgba(168,85,247,.1)':isHigh?'box-shadow:0 0 12px rgba(245,158,11,.08)':''}"
+               onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--card-hover)'"
+               onmouseout="this.style.borderColor='${v.source_trust==='official'?'var(--purple)44':isHigh?'var(--orange)33':'var(--border)'}';this.style.background='var(--card)'"
+               ${videoUrl ? `onclick="window.open('${videoUrl}','_blank')"` : ''}">
+            ${cover ? `<img src="${cover}" style="width:180px;height:110px;object-fit:cover;border-radius:6px;flex-shrink:0" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${v.title || ''}</div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--text2);margin-bottom:6px">
+                <span style="font-weight:600;color:${tb.color}">${v.author || ''}</span>
+                <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${tb.bg};color:${tb.color};font-weight:600">${tb.label}</span>
+                <span>${ageStr}</span>
+                <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--purple)15;color:var(--purple)">${v.pv_keyword || ''}</span>
+                ${pvScore >= 30 ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--green)22;color:var(--green)">高可信度</span>` : ''}
+                ${v.content_type && v.content_type === 'pv' ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--pink)22;color:var(--pink)">PV/预告</span>` : v.content_type && v.content_type !== 'unknown' ? `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--orange)22;color:var(--orange)">${v.content_type_name || v.content_type}</span>` : ''}
+              </div>
+              ${(v.studio || v.game_genre) ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;margin-bottom:6px">
+                ${v.studio ? `<span style="padding:2px 8px;border-radius:4px;background:rgba(59,130,246,.12);color:#3b82f6;font-weight:600;border:1px solid rgba(59,130,246,.2)">🏢 ${v.studio}</span>` : ''}
+                ${v.game_genre ? `<span style="padding:2px 8px;border-radius:4px;background:rgba(168,85,247,.12);color:#a855f7;font-weight:600;border:1px solid rgba(168,85,247,.2)">🎮 ${v.game_genre}</span>` : ''}
+              </div>` : ''}
+              <div style="display:flex;align-items:center;gap:12px;font-size:12px">
+                <span style="color:${playColor};font-weight:${isHigh?'700':'400'}">▶ ${fmtNum(play)}</span>
+                <span>👍 ${fmtNum(v.like || 0)}</span>
+                <span>💬 ${fmtNum(v.danmaku || 0)}</span>
+                ${v.favorites ? `<span>⭐ ${fmtNum(v.favorites)}</span>` : ''}
+              </div>
+            </div>
+          </div>`;
+      }
+      
+      html += '</div></div>';
+    }
+  }
+
+  if (!videos.length) {
+    html += '<div style="text-align:center;color:var(--text2);padding:40px">该时间段暂无新游PV</div>';
+  }
+
+  html += '</div>';
+
+  // 底部搜索词说明
+  html += `
+    <div style="margin-top:24px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:12px;color:var(--text2)">
+        <span style="font-weight:600;color:var(--purple)">监测关键词：</span>
+        ${(pvTimelineData?.keywords_used || []).map(kw => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:var(--purple)11;border:1px solid var(--purple)33;border-radius:10px;font-size:11px">${kw}</span>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px">
+        过滤规则：① 排除已有游戏运营更新 ② 自然语言识别标题，过滤攻略/教学/直播/赛事等非PV内容 ③ 优先展示官方/权威媒体发布
+        ${pvTimelineData?.search_time ? ` · 搜索时间: ${new Date(pvTimelineData.search_time).toLocaleString('zh-CN')}` : ''}
+      </div>
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+// ── searchKeyword (from hot search tags -> trending tab) ──
+function searchKeyword(kw) {
+  switchTab('trending');
+  setTimeout(() => {
+    const input = document.getElementById('filterKeyword');
+    if (input) {
+      input.value = kw;
+      applyTrendingFilter();
+    }
+  }, 200);
+}
+
+// ── Video Category System ──
+const VIDEO_CATEGORIES = [
+  {
+    id: 'update',
+    name: '运营/活动',
+    color: '#3b82f6',
+    desc: '已上线游戏的版本更新、活动、新角色、新皮肤、DLC',
+    keywords: ['活动', '版本', '更新', 'PV', '宣传', 'PV', '新版', '新赛季', '赛季', '新角色',
+      '新皮肤', '皮肤', '联动', '周年', '限定', '卡池', '新卡', '抽卡', 'UP池', '复刻',
+      'DLC', '资料片', '新章', '新增', '上线', '先行', '前瞻', '直播', '公告',
+      '维护', '补偿', '返场', '签到', '福利', '新地图', '新模式', '新英雄', '新武器'],
+  },
+  {
+    id: 'newgame',
+    name: '新游/发布',
+    color: '#a855f7',
+    desc: '新游戏发布、评测、预告、试玩、首发',
+    keywords: ['新游', '首发', '评测', '试玩', '预告', '发布', '公测', '内测', '开服',
+      '测试服', '发售', '首曝', '实机', '预购', 'EA', 'demo', 'Demo', 'DEMO',
+      '体验版', '先行版', '抢先体验', '即将', '定档', '独立游戏', '国产游戏',
+      '制作人', '开发者', '工作室'],
+  },
+  {
+    id: 'guide',
+    name: '攻略/教学',
+    color: '#23c55e',
+    desc: '游戏攻略、通关、教程、角色养成、配队',
+    keywords: ['攻略', '教学', '教程', '通关', '全流程', '无伤', '打法', '配队', '养成',
+      '毕业', '阵容', '推荐', '必备', '最强', '零氪', '平民', '入门', '进阶',
+      '手把手', '详解', '解析', '机制', '实战', '上分', '段位', '排位',
+      '连招', '出装', '铭文', '技巧', '思路', '全收集'],
+  },
+  {
+    id: 'streamer',
+    name: '主播/赛事',
+    color: '#f59e0b',
+    desc: '主播内容、电竞赛事、比赛、直播切片',
+    keywords: ['主播', '直播', '切片', '赛事', 'KPL', 'LPL', 'TI', 'S赛', 'MSI',
+      '总决赛', '半决赛', '淘汰赛', '决赛', '冠军', '战队', '选手', '职业',
+      'MVP', '五杀', '超神', '翻盘', '绝杀', '名场面', 'Uzi', 'uzi', 'TheShy',
+      'theshy', 'Faker', 'faker', 'Doinb', '解说', '复盘', '集锦', '高光',
+      '世界赛', '联赛', '杯赛', '锦标赛', '邀请赛'],
+  },
+  {
+    id: 'opinion',
+    name: '舆情/讨论',
+    color: '#ef4444',
+    desc: '社区讨论、争议事件、游戏新闻、行业评论、吐槽',
+    keywords: ['舆情', '争议', '暴雷', '翻车', '塌房', '跑路', '维权', '差评', '抵制',
+      '新闻', '盘点', '现状', '为什么', '怎么了', '凉了', '炸了', '怒了',
+      '吐槽', '批评', '讨论', '看法', '观点', '评价', '分析', '深度',
+      '对比', '行业', '市场', '氪金', '骗氪', '退款', '停服', '关服',
+      '外挂', '开挂', '封号', '毁号', '崩了', '炸服'],
+  },
+  {
+    id: 'fun',
+    name: '娱乐/创作',
+    color: '#fb7299',
+    desc: '搞笑、整活、二创、鬼畜、实况解说',
+    keywords: ['整活', '搞笑', '鬼畜', '名场面', '沙雕', '离谱', '逆天', '绝了',
+      '笑死', 'hhh', '还原', '二创', '同人', 'MMD', 'cos', 'cosplay',
+      '实况', '解说', '试毒', '挑战', '速通', '生存', '极限', '世界纪录',
+      '整合包', '模组', 'MOD', 'mod', '地图'],
+  },
+];
+
+function classifyVideo(v) {
+  const title = (v.title || '').toLowerCase();
+  const desc = (v.desc || '').toLowerCase();
+  const tag = (v.tag || '').toLowerCase();
+  const source = (v.source || '').toLowerCase();
+  const tname = (v.tname || '');
+  const text = title + ' ' + desc + ' ' + tag;
+
+  // 电竞分区强匹配主播/赛事
+  if (tname === '电子竞技') {
+    // 但如果标题明确是舆情类，优先舆情
+    for (const kw of VIDEO_CATEGORIES.find(c=>c.id==='opinion').keywords) {
+      if (text.includes(kw.toLowerCase())) return 'opinion';
+    }
+    return 'streamer';
+  }
+
+  // 按优先级匹配
+  let scores = {};
+  for (const cat of VIDEO_CATEGORIES) {
+    let score = 0;
+    for (const kw of cat.keywords) {
+      if (text.includes(kw.toLowerCase())) score++;
+    }
+    scores[cat.id] = score;
+  }
+
+  // 来源为搜索:游戏新闻的，倾向舆情/讨论
+  if (source.includes('搜索:游戏新闻')) scores['opinion'] = (scores['opinion'] || 0) + 2;
+  if (source.includes('搜索:新游')) scores['newgame'] = (scores['newgame'] || 0) + 2;
+
+  // 找最高分
+  let best = null, bestScore = 0;
+  for (const [id, s] of Object.entries(scores)) {
+    if (s > bestScore) { bestScore = s; best = id; }
+  }
+
+  return best || 'fun'; // 默认归为娱乐/创作
+}
+
+function getCategoryInfo(catId) {
+  return VIDEO_CATEGORIES.find(c => c.id === catId) || VIDEO_CATEGORIES[VIDEO_CATEGORIES.length - 1];
+}
+
+// ── Ratio helpers ──
+function calcRatio(a, b) {
+  if (!b || b <= 0) return 0;
+  return a / b;
+}
+function fmtPct(ratio) {
+  const pct = ratio * 100;
+  if (pct >= 10) return pct.toFixed(1) + '%';
+  if (pct >= 1) return pct.toFixed(2) + '%';
+  return pct.toFixed(3) + '%';
+}
+function ratioColor(ratio, type) {
+  if (type === 'like') {
+    if (ratio >= 0.05) return 'var(--green)';
+    if (ratio >= 0.03) return 'var(--orange)';
+    return 'var(--text2)';
+  }
+  if (type === 'danmaku') {
+    if (ratio >= 0.01) return 'var(--green)';
+    if (ratio >= 0.005) return 'var(--orange)';
+    return 'var(--text2)';
+  }
+  if (type === 'reply') {
+    if (ratio >= 0.005) return 'var(--green)';
+    if (ratio >= 0.002) return 'var(--orange)';
+    return 'var(--text2)';
+  }
+  return 'var(--text2)';
+}
+
+// ── Video Grid Component ──
+function renderVideoGrid(videos) {
+  if (!videos || !videos.length) return '';
+
+  return '<div class="video-grid">' + videos.map(v => {
+    const isHot = v.play >= 500000;
+    const freshness = v.freshness_score || 0;
+    const isFresh = freshness >= 10000;
+    const cover = v.cover ? (v.cover.startsWith('//') ? 'https:' + v.cover : v.cover) : '';
+    const videoUrl = v.url || (v.bvid ? `https://www.bilibili.com/video/${v.bvid}` : '');
+    const play = v.play || 0;
+    const likeR = calcRatio(v.like || 0, play);
+    const danmakuR = calcRatio(v.danmaku || 0, play);
+    const replyR = calcRatio(v.reply || 0, play);
+    const catId = classifyVideo(v);
+    const cat = getCategoryInfo(catId);
+
+    return `
+      <div class="video-card${isHot || isFresh ? ' hot' : ''}" ${videoUrl ? `onclick="window.open('${videoUrl}','_blank')"` : ''}>
+        ${cover ? `<img class="cover" src="${cover}" alt="" loading="lazy" onerror="this.style.display='none'">` : '<div class="cover" style="background:var(--border);display:flex;align-items:center;justify-content:center;color:var(--text2)">无封面</div>'}
+        <div class="info">
+          <div class="title">${v.title || ''}</div>
+          <div class="meta">
+            <span class="author">${v.author || ''}</span>
+            <span>${timeAgo(v.pubdate)}</span>
+            <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:${cat.color}22;color:${cat.color};font-weight:600">${cat.name}</span>
+            <span class="source-tag">${v.source || ''}</span>
+            ${isHot ? '<span class="hot-badge">爆款</span>' : ''}
+            ${isFresh ? `<span class="hot-badge" style="background:rgba(245,158,11,.15);color:var(--orange)">新鲜度 ${fmtNum(freshness)}</span>` : ''}
+          </div>
+          <div class="stats">
+            <span>▶ ${fmtNum(play)}</span>
+            <span>👍 ${fmtNum(v.like || 0)}</span>
+            <span>💬 ${fmtNum(v.danmaku || 0)}</span>
+            ${v.reply ? `<span>📝 ${fmtNum(v.reply)}</span>` : ''}
+          </div>
+          <div class="stats" style="margin-top:4px;font-size:11px;border-top:1px solid var(--border);padding-top:6px">
+            <span style="color:${ratioColor(likeR,'like')}">赞率 ${fmtPct(likeR)}</span>
+            <span style="color:${ratioColor(danmakuR,'danmaku')}">弹幕率 ${fmtPct(danmakuR)}</span>
+            <span style="color:${ratioColor(replyR,'reply')}">评论率 ${fmtPct(replyR)}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+// ── Settings ──
+async function openSettings() {
+  const cfg = currentConfig || await fetchConfig();
+  if (cfg) currentConfig = cfg;
+
+  // 填充关键词
+  const area = document.getElementById('keywordsArea');
+  const input = document.getElementById('keywordInput');
+  area.querySelectorAll('.tag-item').forEach(t => t.remove());
+  (cfg?.keywords || []).forEach(kw => {
+    const tag = document.createElement('span');
+    tag.className = 'tag-item';
+    tag.innerHTML = `${kw} <span class="remove" onclick="this.parentElement.remove()">&times;</span>`;
+    area.insertBefore(tag, input);
+  });
+
+  document.getElementById('intervalInput').value = cfg?.interval_minutes || 60;
+  document.getElementById('playThreshold').value = cfg?.notify?.play_threshold || 500000;
+  document.getElementById('likeThreshold').value = cfg?.notify?.like_threshold || 50000;
+  document.getElementById('notifyEnabled').value = String(cfg?.notify?.enabled || false);
+  document.getElementById('notifyType').value = cfg?.notify?.type || 'feishu';
+  document.getElementById('webhookUrl').value = cfg?.notify?.webhook_url || '';
+
+  // UP主
+  const upLines = Object.entries(cfg?.up_mids || {}).map(([name, mid]) => `${name}=${mid}`);
+  document.getElementById('upMidsInput').value = upLines.join('\n');
+
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+function addKeyword(e) {
+  if (e.key !== 'Enter') return;
+  const input = e.target;
+  const kw = input.value.trim();
+  if (!kw) return;
+
+  const area = document.getElementById('keywordsArea');
+  const tag = document.createElement('span');
+  tag.className = 'tag-item';
+  tag.innerHTML = `${kw} <span class="remove" onclick="this.parentElement.remove()">&times;</span>`;
+  area.insertBefore(tag, input);
+  input.value = '';
+}
+
+async function saveSettings() {
+  const area = document.getElementById('keywordsArea');
+  const keywords = Array.from(area.querySelectorAll('.tag-item')).map(t => t.textContent.replace('×', '').trim());
+
+  const upText = document.getElementById('upMidsInput').value.trim();
+  const upMids = {};
+  if (upText) {
+    upText.split('\n').forEach(line => {
+      const parts = line.trim().split('=');
+      if (parts.length === 2 && parts[1].trim()) {
+        upMids[parts[0].trim()] = parseInt(parts[1].trim());
+      }
+    });
+  }
+
+  const cfg = {
+    keywords,
+    interval_minutes: parseInt(document.getElementById('intervalInput').value) || 60,
+    up_mids: upMids,
+    notify: {
+      enabled: document.getElementById('notifyEnabled').value === 'true',
+      type: document.getElementById('notifyType').value,
+      webhook_url: document.getElementById('webhookUrl').value.trim(),
+      play_threshold: parseInt(document.getElementById('playThreshold').value) || 500000,
+      like_threshold: parseInt(document.getElementById('likeThreshold').value) || 50000,
+    },
+  };
+
+  try {
+    const result = await postConfig(cfg);
+    if (result.ok) {
+      currentConfig = result.config;
+      toast('设置已保存');
+      closeSettings();
+    } else {
+      toast('保存失败: ' + (result.error || '未知错误'), 'var(--red)');
+    }
+  } catch (e) {
+    toast('保存失败: ' + e.message, 'var(--red)');
+  }
+}
+
+// ── Init ──
+async function init() {
+  currentConfig = await fetchConfig();
+  await loadData();
+  updateStatus();
+  setInterval(updateStatus, 15000);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "keywords": [
+    "游戏新闻",
+    "新游",
+    "手游推荐",
+    "steam",
+    "原神",
+    "崩坏星穹铁道",
+    "王者荣耀",
+    "英雄联盟",
+    "GTA6",
+    "任天堂",
+    "独立游戏",
+    "黑神话悟空"
+  ],
+  "game_regions": {
+    "单机游戏": 17,
+    "电子竞技": 171,
+    "手机游戏": 172,
+    "网络游戏": 65
+  },
+  "up_mids": {},
+  "hot_limit": 30,
+  "region_limit": 20,
+  "search_limit": 15,
+  "ranking_limit": 30,
+  "max_age_days": 7,
+  "interval_minutes": 60,
+  "notify": {
+    "enabled": false,
+    "type": "feishu",
+    "webhook_url": "",
+    "play_threshold": 500000,
+    "like_threshold": 50000
+  }
+}
