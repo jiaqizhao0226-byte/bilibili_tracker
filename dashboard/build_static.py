@@ -164,6 +164,118 @@ def build_trending_data(snapshots):
     }
 
 
+def build_pv_timeline_data(hours=48, limit_per_kw=20, include_creators=False):
+    """构建静态模式下的新游PV时间轴数据。"""
+    try:
+        from server import DashboardHandler, fetch_search
+    except Exception as e:
+        print(f"⚠️ PV追踪静态数据构建跳过: {e}")
+        return {
+            "videos": [],
+            "total": 0,
+            "rejected_count": 0,
+            "rejected_sample": [],
+            "rejected_by_content_type": 0,
+            "rejected_by_game_update": 0,
+            "keywords_used": [],
+            "hours": hours,
+            "include_creators": include_creators,
+            "search_time": datetime.now().isoformat(),
+            "error": str(e),
+        }
+
+    pv_keywords = [
+        "全新游戏 PV", "新游 首曝", "新游 PV", "新作 预告",
+        "游戏 首曝", "游戏 新作公布", "游戏 全球首曝",
+        "游戏 概念PV", "游戏 先导预告", "新游 宣传片",
+        "游戏 announce trailer", "游戏 reveal trailer",
+        "TGA 新游", "新游 实机演示",
+    ]
+
+    print(f"  PV追踪: 搜索 {len(pv_keywords)} 个关键词, 近{hours}h")
+
+    handler = object.__new__(DashboardHandler)
+    all_results = []
+    rejected = []
+    seen_bvids = set()
+    now_ts = time.time()
+    cutoff_ts = now_ts - hours * 3600
+
+    for kw in pv_keywords:
+        try:
+            videos = fetch_search(kw, limit=min(limit_per_kw, 30), order="pubdate")
+            for v in videos:
+                bvid = v.get("bvid", "")
+                if not bvid or bvid in seen_bvids:
+                    continue
+                seen_bvids.add(bvid)
+
+                pub_ts = v.get("pubdate_ts", 0)
+                if not (pub_ts and pub_ts >= cutoff_ts):
+                    continue
+
+                classification = handler._classify_pv_video(v)
+                v["pv_keyword"] = kw
+                v["source_trust"] = classification["source_trust"]
+                v["pv_score"] = classification["pv_score"]
+                v["is_new_game"] = classification["is_new_game"]
+
+                age_hours = max((now_ts - pub_ts) / 3600, 1)
+                v["freshness_score"] = round(v.get("play", 0) / age_hours)
+
+                if not classification["is_new_game"]:
+                    v["reject_reason"] = classification["reject_reason"]
+                    rejected.append(v)
+                    continue
+
+                content_info = handler._detect_content_type(v)
+                v["content_type"] = content_info["content_type"]
+                v["content_type_name"] = content_info["content_name"]
+                v["content_confidence"] = content_info["confidence"]
+
+                if content_info["content_type"] not in ("pv", "unknown") and content_info["confidence"] >= 0.4:
+                    v["reject_reason"] = (
+                        f"内容类型为「{content_info['content_name']}」"
+                        f"（匹配: {'、'.join(content_info['matched_keywords'][:4])}）"
+                    )
+                    rejected.append(v)
+                    continue
+
+                if classification["source_trust"] == "creator" and not include_creators:
+                    if classification["pv_score"] < 20:
+                        v["reject_reason"] = "非权威来源（静态快照默认不展示）"
+                        rejected.append(v)
+                        continue
+
+                all_results.append(v)
+            time.sleep(0.8)
+        except Exception as e:
+            print(f"  ⚠️ PV搜索 [{kw}] 失败: {e}")
+
+    for v in all_results:
+        game_info = handler._enrich_game_info(v)
+        v["studio"] = game_info.get("studio", "")
+        v["game_genre"] = game_info.get("genre", "")
+
+    all_results.sort(key=lambda x: (x.get("pv_score", 0), x.get("pubdate_ts", 0)), reverse=True)
+
+    content_type_rejected = sum(1 for v in rejected if "内容类型" in (v.get("reject_reason") or ""))
+    game_update_rejected = len(rejected) - content_type_rejected
+
+    return {
+        "videos": all_results,
+        "total": len(all_results),
+        "rejected_count": len(rejected),
+        "rejected_sample": rejected[:20],
+        "rejected_by_content_type": content_type_rejected,
+        "rejected_by_game_update": game_update_rejected,
+        "keywords_used": pv_keywords,
+        "hours": hours,
+        "include_creators": include_creators,
+        "search_time": datetime.now().isoformat(),
+    }
+
+
 def build_static():
     print("📦 构建纯静态看板...")
 
@@ -179,12 +291,14 @@ def build_static():
 
     overview_data = build_overview_data(snapshots)
     trending_data = build_trending_data(snapshots)
+    pv_timeline_data = build_pv_timeline_data(hours=48, include_creators=False)
 
     # 最新一次的原始数据（用于 trending 的 fetchData）
     latest_raw = snapshots[0] if snapshots else {}
 
     print(f"  总览: {overview_data['total']} 个视频, {overview_data['hot_count']} 个爆款")
     print(f"  爆款: {trending_data['total']} 个视频")
+    print(f"  PV追踪: {pv_timeline_data['total']} 个候选PV, 过滤 {pv_timeline_data['rejected_count']} 条")
 
     # 构建内嵌数据脚本
     embed_script = f"""
@@ -193,6 +307,7 @@ def build_static():
 window.__STATIC_MODE__ = true;
 window.__OVERVIEW_DATA__ = {json.dumps(overview_data, ensure_ascii=False)};
 window.__TRENDING_DATA__ = {json.dumps(trending_data, ensure_ascii=False)};
+window.__PV_TIMELINE_DATA__ = {json.dumps(pv_timeline_data, ensure_ascii=False)};
 window.__LATEST_RAW__ = {json.dumps(latest_raw, ensure_ascii=False)};
 window.__BUILD_TIME__ = "{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}";
 </script>
@@ -261,6 +376,27 @@ if (window.__STATIC_MODE__) {
   // 覆盖 fetchConfig / fetchStatus
   window.fetchConfig = async () => ({});
   window.fetchStatus = async () => ({ running: false, interval: 0, last_collect: '', next_collect: '' });
+
+  // 静态模式下使用构建时预计算的新游PV数据，不再依赖后端接口
+  window.loadPVTimeline = async function() {
+    const hours = window.__PV_TIMELINE_DATA__?.hours || 48;
+    const container = document.getElementById('pvTimeline');
+    if (!container) return;
+    const data = window.__PV_TIMELINE_DATA__ || { videos: [], total: 0, keywords_used: [], hours };
+    pvTimelineData = data;
+
+    if (!data.videos || !data.videos.length) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding:40px">
+          <div class="icon">🎬</div>
+          <div class="title">本次静态快照暂无全新游戏PV</div>
+          <p>已在构建时完成PV搜索；可稍后重新采集并部署刷新结果</p>
+        </div>`;
+      return;
+    }
+
+    renderPVTimelineView(data.videos, container, hours);
+  };
 
   // 隐藏采集按钮，显示静态模式提示
   document.addEventListener('DOMContentLoaded', () => {
