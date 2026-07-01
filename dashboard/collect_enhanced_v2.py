@@ -131,6 +131,7 @@ def parse_ranking_item(idx, item):
         "mid": item.get("owner", {}).get("mid", 0) or item.get("mid", 0),
         "bvid": item.get("bvid", ""),
         "url": f"https://www.bilibili.com/video/{item.get('bvid', '')}",
+        "cover": item.get("pic", "") or item.get("cover", ""),
         "play": stat.get("view", 0) or item.get("play", 0),
         "danmaku": stat.get("danmaku", 0) or item.get("video_review", 0),
         "like": stat.get("like", 0),
