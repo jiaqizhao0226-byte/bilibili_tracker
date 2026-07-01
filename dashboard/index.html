@@ -777,48 +777,80 @@ async function renderOverview(el) {
       </div>
     </div>`;
 
-    // 每日趋势
+    // 每日趋势 - 增强版可视化
     const sortedDays = Object.keys(dayStats).sort();
     if (sortedDays.length > 1) {
+      const dayData = sortedDays.map(day => ({ day, ...dayStats[day] }));
+      const maxTotal = Math.max(...dayData.map(d => d.total || 1));
+      const maxPlay = Math.max(...dayData.map(d => d.max_play || 0));
+      const totalVideos = dayData.reduce((s, d) => s + (d.total || 0), 0);
+      const totalHot = dayData.reduce((s, d) => s + (d.hot || 0), 0);
+
+      // SVG 折线图 + 柱状图组合
+      const chartW = Math.max(dayData.length * 80, 320);
+      const chartH = 140;
+      const padL = 36, padB = 24, padT = 16, padR = 12;
+      const plotW = chartW - padL - padR;
+      const plotH = chartH - padT - padB;
+      const barW = Math.min(plotW / dayData.length * 0.5, 28);
+      const xStep = plotW / dayData.length;
+
+      const bars = dayData.map((d, i) => {
+        const x = padL + xStep * i + xStep / 2;
+        const totalH = Math.max((d.total / maxTotal) * plotH, 3);
+        const hotH = d.hot ? Math.max((d.hot / maxTotal) * plotH, 2) : 0;
+        const yBar = padT + plotH - totalH;
+        const yHot = padT + plotH - hotH;
+        return { x, yBar, totalH, hotH, yHot, d };
+      });
+
+      // 最大播放量折线
+      const linePts = bars.map(b => `${b.x},${padT + plotH - Math.max((b.d.max_play / maxPlay) * plotH, 2)}`).join(' ');
+
       html += `
       <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px">
-        <h3 style="font-size:14px;margin-bottom:12px">每日趋势</h3>
-        <div style="display:flex;align-items:flex-end;gap:6px;height:120px;overflow-x:auto">
-          ${sortedDays.map(day => {
-            const s = dayStats[day];
-            const maxTotal = Math.max(...sortedDays.map(d => dayStats[d].total || 1));
-            const barH = Math.max(Math.round((s.total / maxTotal) * 100), 8);
-            const hotH = s.hot ? Math.max(Math.round((s.hot / maxTotal) * 100), 4) : 0;
-            return `<div style="flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;gap:4px">
-              <div style="font-size:10px;color:var(--text2)">${s.total}</div>
-              <div style="width:100%;max-width:40px;position:relative">
-                <div style="width:100%;height:${barH}px;background:var(--accent)33;border-radius:4px 4px 0 0;position:relative">
-                  ${hotH ? `<div style="position:absolute;bottom:0;left:0;width:100%;height:${hotH}px;background:var(--pink)66;border-radius:0 0 0 0"></div>` : ''}
-                </div>
-              </div>
-              <div style="font-size:10px;color:var(--text2)">${day}</div>
-              ${s.hot ? `<div style="font-size:9px;color:var(--pink)">${s.hot}爆</div>` : ''}
-            </div>`;
-          }).join('')}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <h3 style="font-size:14px">每日趋势 <span style="font-size:11px;color:var(--text2);font-weight:400">近7天</span></h3>
+          <div style="display:flex;gap:14px;font-size:11px;color:var(--text2)">
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent)44;border-radius:2px;margin-right:4px;vertical-align:middle"></span>视频数 ${totalVideos}</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--pink)88;border-radius:2px;margin-right:4px;vertical-align:middle"></span>爆款 ${totalHot}</span>
+            <span><span style="display:inline-block;width:14px;height:2px;background:var(--green);margin-right:4px;vertical-align:middle"></span>最高播放</span>
+          </div>
         </div>
-        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text2)">
-          <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent)33;border-radius:2px;margin-right:4px"></span>视频数</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:var(--pink)66;border-radius:2px;margin-right:4px"></span>爆款(50w+)</span>
+        <div style="overflow-x:auto">
+          <svg width="${chartW}" height="${chartH}" style="display:block">
+            <defs>
+              <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.15"/>
+              </linearGradient>
+            </defs>
+            ${Array.from({length: 4}, (_, i) => {
+              const y = padT + (plotH / 3) * i;
+              const val = Math.round(maxTotal * (1 - i / 3));
+              return `<line x1="${padL}" y1="${y}" x2="${chartW - padR}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3"/>
+                <text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text2)">${val}</text>`;
+            }).join('')}
+            ${bars.map(b => `
+              <g>
+                <rect x="${b.x - barW/2}" y="${b.yBar}" width="${barW}" height="${b.totalH}" rx="3" fill="url(#barGrad)" stroke="var(--accent)" stroke-width="0.5" stroke-opacity="0.4"/>
+                ${b.hotH ? `<rect x="${b.x - barW/2}" y="${b.yHot}" width="${barW}" height="${b.hotH}" rx="2" fill="var(--pink)" fill-opacity="0.7"/>` : ''}
+                <text x="${b.x}" y="${b.yBar - 4}" text-anchor="middle" font-size="10" fill="var(--text)" font-weight="500">${b.d.total}</text>
+                <text x="${b.x}" y="${padT + plotH + 14}" text-anchor="middle" font-size="10" fill="var(--text2)">${b.d.day}</text>
+                ${b.d.max_play ? `<text x="${b.x}" y="${padT + plotH + 26}" text-anchor="middle" font-size="8" fill="var(--green)" fill-opacity="0.8">${(b.d.max_play/10000).toFixed(0)}w</text>` : ''}
+              </g>
+            `).join('')}
+            <polyline points="${linePts}" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" stroke-opacity="0.8"/>
+            ${bars.map(b => {
+              const ly = padT + plotH - Math.max((b.d.max_play / maxPlay) * plotH, 2);
+              return `<circle cx="${b.x}" cy="${ly}" r="2.5" fill="var(--green)"/>`;
+            }).join('')}
+          </svg>
         </div>
       </div>`;
     }
 
-    // 热搜
-    if (d.hot_search && d.hot_search.length) {
-      html += '<h3 style="margin-bottom:12px;font-size:15px">实时热搜</h3><div class="hot-search">';
-      d.hot_search.forEach(h => {
-        const cls = h.rank <= 3 ? 'top3' : '';
-        html += `<div class="hot-tag" onclick="searchKeyword('${h.keyword}')">
-          <span class="rank ${cls}">${h.rank}</span> ${h.keyword}
-        </div>`;
-      });
-      html += '</div>';
-    }
+    // 热搜模块已移除
 
     // 分类统计
     const catCounts = {};
